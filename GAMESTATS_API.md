@@ -9,6 +9,7 @@ The GameStats API extends the basic statistics available in Mindustry by providi
 - **Economy Statistics**: Production, consumption, and resource flow tracking
 - **Power Statistics**: Generation, consumption, efficiency, and shortage monitoring  
 - **Uptime and Efficiency**: Performance metrics and utilization tracking
+- **Game Outcome Tracking**: Win/loss detection with real-time notifications
 - **Real-time Monitoring**: Live updates and event-driven statistics
 - **Data Export**: JSON and CSV export capabilities
 
@@ -255,6 +256,105 @@ handler.register("stats", "Show game statistics", args -> {
     var summary = stats.getPerformanceSummary();
     info("Current stats: " + stats.exportStatsAsJSON());
 });
+```
+
+### Game Outcome Tracking
+
+The GameStats API provides comprehensive tracking of game outcomes, including win/loss detection and notifications:
+
+```java
+// Check current game state
+GameOutcome outcome = statsAPI.getGameOutcome();
+System.out.println("Game ended: " + outcome.gameEnded);
+System.out.println("Victory: " + outcome.victory);
+System.out.println("Winner: " + outcome.winnerTeam);
+
+// Simple checks
+boolean gameEnded = statsAPI.hasGameEnded();
+boolean controllerWon = statsAPI.didControllerTeamWin();
+String winner = statsAPI.getWinnerTeam();
+```
+
+#### Game Outcome Events
+
+Register listeners to receive notifications when games end:
+
+```java
+// Add outcome listener
+statsAPI.addGameOutcomeListener(new GameStatsAPI.GameOutcomeListener() {
+    @Override
+    public void onGameEnd(GameStatsAPI.GameOutcome outcome) {
+        System.out.println("Game ended! Winner: " + outcome.winnerTeam);
+        System.out.println("End reason: " + outcome.endReason);
+        System.out.println("Final wave: " + outcome.finalWave);
+        
+        // Log all participating teams
+        for (String team : outcome.participatingTeams) {
+            System.out.println("Participant: " + team);
+        }
+    }
+    
+    @Override
+    public void onControllerTeamVictory(GameStatsAPI.GameOutcome outcome) {
+        System.out.println("🎉 VICTORY! We won on wave " + outcome.finalWave);
+        // Send victory notification, update leaderboards, etc.
+    }
+    
+    @Override
+    public void onControllerTeamDefeat(GameStatsAPI.GameOutcome outcome) {
+        System.out.println("💀 DEFEAT! Lost to " + outcome.winnerTeam);
+        // Handle defeat logic, restart game, etc.
+    }
+});
+```
+
+#### GameOutcome Data Structure
+
+The `GameOutcome` class provides comprehensive information about game results:
+
+```java
+public class GameOutcome {
+    public boolean gameEnded;          // Whether the game has ended
+    public boolean victory;            // Whether it was a victory (vs defeat)
+    public String winnerTeam;          // Name of the winning team
+    public String endReason;           // Reason the game ended
+    public long gameEndTime;           // Timestamp when game ended
+    public int finalWave;              // Wave number when game ended
+    public boolean controllerTeamWon;  // Whether the API controller's team won
+    public String[] participatingTeams; // All teams that participated
+}
+```
+
+#### Use Cases
+
+**Victory Notifications**: Get notified immediately when your team wins
+```java
+statsAPI.addGameOutcomeListener(new GameOutcomeListener() {
+    public void onControllerTeamVictory(GameOutcome outcome) {
+        sendDiscordNotification("Victory on wave " + outcome.finalWave + "!");
+        updatePlayerStats(outcome);
+    }
+});
+```
+
+**Automated Restarts**: Restart games automatically after defeat
+```java
+public void onControllerTeamDefeat(GameOutcome outcome) {
+    logger.info("Game lost, restarting in 10 seconds...");
+    Timer.schedule(() -> restartGame(), 10f);
+}
+```
+
+**Statistics Logging**: Track game outcomes for analysis
+```java
+public void onGameEnd(GameOutcome outcome) {
+    GameResult result = new GameResult(
+        outcome.victory,
+        outcome.finalWave,
+        outcome.gameEndTime - outcome.gameStartTime
+    );
+    database.saveGameResult(result);
+}
 ```
 
 ## Best Practices
