@@ -26,11 +26,13 @@ public class ControllerAPIImpl implements ControllerAPI {
     private GameController gameController;
     private WorldController worldController;
     private AdminController adminController;
+    private GameStatsAPIImpl gameStatsAPI;
     
     public ControllerAPIImpl() {
         this.gameController = new GameControllerImpl(this);
         this.worldController = new WorldControllerImpl();
         this.adminController = new AdminControllerImpl();
+        this.gameStatsAPI = new GameStatsAPIImpl();
         this.running = true;
     }
     
@@ -159,6 +161,11 @@ public class ControllerAPIImpl implements ControllerAPI {
     @Override
     public Seq<Map> getAvailableMaps() {
         return maps.all().copy();
+    }
+    
+    @Override
+    public GameStatsAPI getGameStats() {
+        return gameStatsAPI;
     }
     
     @Override

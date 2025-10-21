@@ -61,6 +61,11 @@ public interface ControllerAPI {
     /** Generate a new random map */
     Map generateMap(int width, int height, MapGenParams params);
     
+    // === Statistics and Monitoring ===
+    
+    /** Get advanced game statistics API */
+    GameStatsAPI getGameStats();
+    
     // === Event System ===
     
     /** Register an event listener */
