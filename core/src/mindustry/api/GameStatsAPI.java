@@ -280,4 +280,51 @@ public interface GameStatsAPI {
         /** Called when statistics are updated */
         void onStatsUpdate(GamePerformanceSummary summary);
     }
+    
+    // === Game Outcome Tracking ===
+    
+    /** Game outcome information */
+    class GameOutcome {
+        public boolean gameEnded;
+        public boolean victory;
+        public String winnerTeam;
+        public String endReason;
+        public long gameEndTime;
+        public int finalWave;
+        public boolean controllerTeamWon;
+        public String[] participatingTeams;
+    }
+    
+    /** Get current game outcome information */
+    GameOutcome getGameOutcome();
+    
+    /** Check if the game has ended */
+    boolean hasGameEnded();
+    
+    /** Check if this was a victory for the controller's team */
+    boolean didControllerTeamWin();
+    
+    /** Get the winning team name (null if game not ended) */
+    String getWinnerTeam();
+    
+    /** Get the reason the game ended */
+    String getGameEndReason();
+    
+    /** Listener interface for game outcome notifications */
+    interface GameOutcomeListener {
+        /** Called when the game ends */
+        void onGameEnd(GameOutcome outcome);
+        
+        /** Called when the controller's team wins */
+        void onControllerTeamVictory(GameOutcome outcome);
+        
+        /** Called when the controller's team loses */
+        void onControllerTeamDefeat(GameOutcome outcome);
+    }
+    
+    /** Add a game outcome listener */
+    void addGameOutcomeListener(GameOutcomeListener listener);
+    
+    /** Remove a game outcome listener */
+    void removeGameOutcomeListener(GameOutcomeListener listener);
 }

@@ -31,6 +31,7 @@ public class GameStatsAPIExample {
             demonstrateBasicStats();
             demonstrateEconomyStats();
             demonstratePowerStats();
+            demonstrateGameOutcomeTracking();
             demonstrateRealTimeMonitoring();
             demonstrateDataExport();
             
@@ -136,6 +137,62 @@ public class GameStatsAPIExample {
         Log.info("  Efficiency: " + String.format("%.2f%%", powerSummary.efficiency * 100));
         Log.info("  Storage utilization: " + String.format("%.2f%%", powerSummary.storageUtilization * 100));
         Log.info("  Shortage events: " + powerSummary.shortageEvents);
+    }
+    
+    private void demonstrateGameOutcomeTracking() {
+        Log.info("=== Game Outcome Tracking ===");
+        
+        // Add game outcome listeners
+        statsAPI.addGameOutcomeListener(new GameStatsAPI.GameOutcomeListener() {
+            @Override
+            public void onGameEnd(GameStatsAPI.GameOutcome outcome) {
+                Log.info("GAME ENDED!");
+                Log.info("  Victory: " + outcome.victory);
+                Log.info("  Winner: " + outcome.winnerTeam);
+                Log.info("  Reason: " + outcome.endReason);
+                Log.info("  Final Wave: " + outcome.finalWave);
+                Log.info("  Game Duration: " + (outcome.gameEndTime - outcome.gameStartTime) + "ms");
+                Log.info("  Participating Teams: " + String.join(", ", outcome.participatingTeams));
+            }
+            
+            @Override
+            public void onControllerTeamVictory(GameStatsAPI.GameOutcome outcome) {
+                Log.info("CONTROLLER TEAM VICTORY! 🎉");
+                Log.info("  Team: " + outcome.winnerTeam);
+                Log.info("  Victory achieved on wave " + outcome.finalWave);
+            }
+            
+            @Override
+            public void onControllerTeamDefeat(GameStatsAPI.GameOutcome outcome) {
+                Log.info("CONTROLLER TEAM DEFEATED! 💀");
+                Log.info("  Winner: " + outcome.winnerTeam);
+                Log.info("  Defeat on wave " + outcome.finalWave);
+            }
+        });
+        
+        // Check current game state
+        var outcome = statsAPI.getGameOutcome();
+        Log.info("Current game state:");
+        Log.info("  Game ended: " + outcome.gameEnded);
+        Log.info("  Has ended: " + statsAPI.hasGameEnded());
+        
+        if (outcome.gameEnded) {
+            Log.info("  Victory: " + outcome.victory);
+            Log.info("  Winner: " + outcome.winnerTeam);
+            Log.info("  Controller team won: " + outcome.controllerTeamWon);
+            Log.info("  End reason: " + outcome.endReason);
+        } else {
+            Log.info("  Game is still active");
+        }
+        
+        // Demonstrate winner checking
+        String winner = statsAPI.getWinnerTeam();
+        if (winner != null) {
+            Log.info("Winner determined: " + winner);
+            Log.info("Controller team won: " + statsAPI.didControllerTeamWin());
+        } else {
+            Log.info("No winner yet - game is ongoing");
+        }
     }
     
     private void demonstrateRealTimeMonitoring() {

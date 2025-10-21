@@ -16,8 +16,14 @@ import static mindustry.Vars.*;
 public class GameStatsAPIImpl implements GameStatsAPI {
     
     private final Seq<StatsUpdateListener> listeners = new Seq<>();
+    private final Seq<GameOutcomeListener> outcomeListeners = new Seq<>();
     private int updateInterval = 60; // 60 ticks = 1 second
     private long lastUpdate = 0;
+    
+    // Game outcome tracking
+    private GameOutcome currentOutcome = new GameOutcome();
+    private boolean wasGameOver = false;
+    private String controllerTeamName = null;
     
     // Cached calculations
     private final ObjectFloatMap<Item> currentProductionCache = new ObjectFloatMap<>();
@@ -622,10 +628,142 @@ public class GameStatsAPIImpl implements GameStatsAPI {
         }
     }
     
+    // === Game Outcome Implementation ===
+    
+    @Override
+    public GameOutcome getGameOutcome() {
+        updateGameOutcome();
+        return currentOutcome;
+    }
+    
+    @Override
+    public boolean hasGameEnded() {
+        return state.gameOver;
+    }
+    
+    @Override
+    public boolean didControllerTeamWin() {
+        updateGameOutcome();
+        return currentOutcome.controllerTeamWon;
+    }
+    
+    @Override
+    public String getWinnerTeam() {
+        updateGameOutcome();
+        return currentOutcome.winnerTeam;
+    }
+    
+    @Override
+    public String getGameEndReason() {
+        updateGameOutcome();
+        return currentOutcome.endReason;
+    }
+    
+    @Override
+    public void addGameOutcomeListener(GameOutcomeListener listener) {
+        if (listener != null) {
+            outcomeListeners.add(listener);
+        }
+    }
+    
+    @Override
+    public void removeGameOutcomeListener(GameOutcomeListener listener) {
+        outcomeListeners.remove(listener);
+    }
+    
+    private void updateGameOutcome() {
+        boolean isGameOver = state.gameOver;
+        
+        // Update basic outcome info
+        currentOutcome.gameEnded = isGameOver;
+        currentOutcome.finalWave = state.wave;
+        
+        if (isGameOver) {
+            if (currentOutcome.gameEndTime == 0) {
+                currentOutcome.gameEndTime = System.currentTimeMillis();
+            }
+            
+            // Determine winner and reason
+            if (state.rules.pvp) {
+                // PvP mode - check which team has cores remaining
+                var teamsWithCores = new Seq<String>();
+                for (var team : state.teams.getActive()) {
+                    if (team.hasCore()) {
+                        teamsWithCores.add(team.team.name);
+                    }
+                }
+                
+                if (teamsWithCores.size == 1) {
+                    currentOutcome.winnerTeam = teamsWithCores.first();
+                    currentOutcome.victory = true;
+                    currentOutcome.endReason = "Enemy cores destroyed";
+                } else if (teamsWithCores.size == 0) {
+                    currentOutcome.winnerTeam = null;
+                    currentOutcome.victory = false;
+                    currentOutcome.endReason = "All teams eliminated";
+                } else {
+                    // Multiple teams with cores - shouldn't happen when game is over
+                    currentOutcome.winnerTeam = "Unknown";
+                    currentOutcome.victory = false;
+                    currentOutcome.endReason = "Game ended unexpectedly";
+                }
+            } else {
+                // Campaign/survival mode
+                if (state.teams.playerTeam().hasCore()) {
+                    currentOutcome.victory = true;
+                    currentOutcome.winnerTeam = state.teams.playerTeam().team.name;
+                    currentOutcome.endReason = "Victory conditions met";
+                } else {
+                    currentOutcome.victory = false;
+                    currentOutcome.winnerTeam = "Enemy";
+                    currentOutcome.endReason = "Core destroyed";
+                }
+            }
+            
+            // Determine if controller team won
+            if (controllerTeamName == null) {
+                controllerTeamName = state.teams.playerTeam().team.name;
+            }
+            currentOutcome.controllerTeamWon = controllerTeamName.equals(currentOutcome.winnerTeam);
+            
+            // Get participating teams
+            var participatingTeams = new Seq<String>();
+            for (var team : state.teams.getActive()) {
+                participatingTeams.add(team.team.name);
+            }
+            currentOutcome.participatingTeams = participatingTeams.toArray(String.class);
+        }
+        
+        // Fire events if game just ended
+        if (isGameOver && !wasGameOver) {
+            fireGameOutcomeEvents();
+            wasGameOver = true;
+        }
+    }
+    
+    private void fireGameOutcomeEvents() {
+        if (outcomeListeners.isEmpty()) return;
+        
+        for (var listener : outcomeListeners) {
+            try {
+                listener.onGameEnd(currentOutcome);
+                
+                if (currentOutcome.controllerTeamWon) {
+                    listener.onControllerTeamVictory(currentOutcome);
+                } else {
+                    listener.onControllerTeamDefeat(currentOutcome);
+                }
+            } catch (Exception e) {
+                Log.err("Error in game outcome listener", e);
+            }
+        }
+    }
+    
     /** Should be called periodically from the game loop */
     public void update() {
         if (System.currentTimeMillis() - lastUpdate >= updateInterval * 16) {
             updateCaches();
+            updateGameOutcome(); // Check for game outcome changes
             fireStatsUpdate();
         }
     }
