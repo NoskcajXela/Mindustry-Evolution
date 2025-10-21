@@ -53,6 +53,29 @@ public interface GameStatsAPI {
     /** Get net item flow (production - consumption) */
     ObjectLongMap<Item> getNetItemFlow();
     
+    // === Additional Resource and Production Statistics ===
+    
+    /** Get total resources produced/gathered across all items */
+    long getTotalResourcesProduced();
+    
+    /** Get average resource throughput (items per second) */
+    float getAverageResourceThroughput();
+    
+    /** Get number of production chains completed */
+    int getProductionChainsCompleted();
+    
+    /** Get resources produced per tick */
+    float getResourcesPerTick();
+    
+    /** Get items transported per tick across all conveyors/transport */
+    float getItemsTransportedPerTick();
+    
+    /** Get average latency in production lines (ticks between input and output) */
+    float getProductionLineLatency();
+    
+    /** Get output per building (average efficiency across all buildings) */
+    float getOutputPerBuilding();
+    
     // === Power Statistics ===
     
     /** Get total power generated (all time) */
@@ -84,6 +107,17 @@ public interface GameStatsAPI {
     
     /** Get power storage capacity */
     float getPowerStorageCapacity();
+    
+    // === Enhanced Power Statistics ===
+    
+    /** Get time spent with positive net power (generation > consumption) */
+    long getTimeWithPositivePower();
+    
+    /** Get ratio of generated vs consumed power (generation/consumption) */
+    float getPowerGenerationRatio();
+    
+    /** Get average power grid uptime percentage */
+    float getAveragePowerGridUptime();
     
     // === Power Shortage Statistics ===
     
@@ -161,6 +195,20 @@ public interface GameStatsAPI {
     /** Get resource efficiency (value mined per minute) */
     float getResourceEfficiencyPerMinute();
     
+    // === Combat and Survival Statistics ===
+    
+    /** Get number of waves survived */
+    int getWavesSurvived();
+    
+    /** Get total damage dealt by player structures/units */
+    long getTotalDamageDealt();
+    
+    /** Get total damage received by player structures/units */
+    long getTotalDamageReceived();
+    
+    /** Get percentage of structures destroyed (destroyed/total built) */
+    float getStructureDestructionPercentage();
+    
     // === Historical Data ===
     
     /** Get production history for an item (last N samples) */
@@ -186,6 +234,15 @@ public interface GameStatsAPI {
     /** Get overall game performance summary */
     GamePerformanceSummary getPerformanceSummary();
     
+    /** Get comprehensive combat summary */
+    CombatSummary getCombatSummary();
+    
+    /** Get comprehensive spatial summary */
+    SpatialSummary getSpatialSummary();
+    
+    /** Get comprehensive transport summary */
+    TransportSummary getTransportSummary();
+
     // === Real-time Monitoring ===
     
     /** Register a callback for real-time statistics updates */
@@ -214,6 +271,28 @@ public interface GameStatsAPI {
     /** Get statistics collection start time */
     long getStatsStartTime();
     
+    // === Spatial and Infrastructure Statistics ===
+    
+    /** Get area covered by structures (in tiles) */
+    int getAreaCoveredByStructures();
+    
+    /** Get distance of furthest structure from core (in tiles) */
+    float getFurthestStructureDistance();
+    
+    /** Get mean resource balance variance (how much resource levels fluctuate) */
+    float getMeanResourceBalanceVariance();
+
+    // === Resource Balance and Production Chain Tracking ===
+    
+    /** Get resource balance for each item (current storage) */
+    ObjectIntMap<Item> getCurrentResourceBalance();
+    
+    /** Get production chain efficiency for complex items */
+    ObjectFloatMap<Item> getProductionChainEfficiency();
+    
+    /** Get bottlenecks in production chains */
+    Seq<ProductionBottleneck> getProductionBottlenecks();
+
     // === Data Classes ===
     
     /** Basic game statistics container */
@@ -226,6 +305,12 @@ public interface GameStatsAPI {
         public int unitsCreated;
         public ObjectIntMap<Block> placedBlockCount;
         public ObjectIntMap<Item> coreItemCount;
+        public int wavesSurvived;
+        public long totalDamageDealt;
+        public long totalDamageReceived;
+        public float structureDestructionPercentage;
+        public int areaCoveredByStructures;
+        public float furthestStructureDistance;
     }
     
     /** Economy statistics summary */
@@ -238,6 +323,14 @@ public interface GameStatsAPI {
         public Item mostProducedItem;
         public Item mostConsumedItem;
         public float economyEfficiency; // production efficiency
+        public long totalResourcesProduced;
+        public float averageResourceThroughput;
+        public int productionChainsCompleted;
+        public float resourcesPerTick;
+        public float itemsTransportedPerTick;
+        public float productionLineLatency;
+        public float outputPerBuilding;
+        public float meanResourceBalanceVariance;
     }
     
     /** Power statistics summary */
@@ -250,6 +343,9 @@ public interface GameStatsAPI {
         public float storageUtilization;
         public int shortageEvents;
         public long averageShortageTime;
+        public long timeWithPositivePower;
+        public float powerGenerationRatio;
+        public float averagePowerGridUptime;
     }
     
     /** Efficiency statistics summary */
@@ -269,6 +365,9 @@ public interface GameStatsAPI {
         public EconomySummary economy;
         public PowerSummary power;
         public EfficiencySummary efficiency;
+        public CombatSummary combat;
+        public SpatialSummary spatial;
+        public TransportSummary transport;
         public long gameStartTime;
         public long currentTime;
         public int currentWave;
@@ -327,4 +426,44 @@ public interface GameStatsAPI {
     
     /** Remove a game outcome listener */
     void removeGameOutcomeListener(GameOutcomeListener listener);
+
+    /** Production bottleneck information */
+    class ProductionBottleneck {
+        public Item item;
+        public Block bottleneckBuilding;
+        public float efficiency;
+        public String reason;
+        public int x, y; // coordinates of bottleneck
+    }
+    
+    /** Combat statistics summary */
+    class CombatSummary {
+        public long totalDamageDealt;
+        public long totalDamageReceived;
+        public int wavesDefeated;
+        public int enemyUnitsDestroyed;
+        public int playerUnitsLost;
+        public float damageRatio; // dealt/received
+        public float structureSurvivalRate;
+    }
+    
+    /** Spatial statistics summary */
+    class SpatialSummary {
+        public int areaCovered;
+        public float furthestDistance;
+        public int totalStructures;
+        public float structureDensity;
+        public float coreProximityScore;
+        public int isolatedStructures;
+    }
+    
+    /** Transport and logistics summary */
+    class TransportSummary {
+        public float itemsPerTick;
+        public float averageLatency;
+        public float transportEfficiency;
+        public int totalConveyors;
+        public int bottleneckPoints;
+        public float throughputUtilization;
+    }
 }

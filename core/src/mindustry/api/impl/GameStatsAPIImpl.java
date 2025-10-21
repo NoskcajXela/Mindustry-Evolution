@@ -6,6 +6,7 @@ import mindustry.api.GameStatsAPI;
 import mindustry.type.*;
 import mindustry.world.*;
 import mindustry.world.blocks.power.*;
+import mindustry.content.Blocks;
 
 import static mindustry.Vars.*;
 
@@ -47,6 +48,15 @@ public class GameStatsAPIImpl implements GameStatsAPI {
         basic.unitsCreated = state.stats.unitsCreated;
         basic.placedBlockCount = state.stats.placedBlockCount.copy();
         basic.coreItemCount = state.stats.coreItemCount.copy();
+        
+        // Add new statistics
+        basic.wavesSurvived = getWavesSurvived();
+        basic.totalDamageDealt = getTotalDamageDealt();
+        basic.totalDamageReceived = getTotalDamageReceived();
+        basic.structureDestructionPercentage = getStructureDestructionPercentage();
+        basic.areaCoveredByStructures = getAreaCoveredByStructures();
+        basic.furthestStructureDistance = getFurthestStructureDistance();
+        
         return basic;
     }
     
@@ -391,6 +401,16 @@ public class GameStatsAPIImpl implements GameStatsAPI {
             summary.economyEfficiency = summary.totalItemsProduced / (float) summary.totalItemsConsumed;
         }
         
+        // Add new statistics
+        summary.totalResourcesProduced = getTotalResourcesProduced();
+        summary.averageResourceThroughput = getAverageResourceThroughput();
+        summary.productionChainsCompleted = getProductionChainsCompleted();
+        summary.resourcesPerTick = getResourcesPerTick();
+        summary.itemsTransportedPerTick = getItemsTransportedPerTick();
+        summary.productionLineLatency = getProductionLineLatency();
+        summary.outputPerBuilding = getOutputPerBuilding();
+        summary.meanResourceBalanceVariance = getMeanResourceBalanceVariance();
+        
         return summary;
     }
     
@@ -406,6 +426,12 @@ public class GameStatsAPIImpl implements GameStatsAPI {
         summary.shortageEvents = getPowerShortageCount();
         summary.averageShortageTime = summary.shortageEvents > 0 ? 
             getTotalPowerShortageTime() / summary.shortageEvents : 0;
+        
+        // Add new statistics
+        summary.timeWithPositivePower = getTimeWithPositivePower();
+        summary.powerGenerationRatio = getPowerGenerationRatio();
+        summary.averagePowerGridUptime = getAveragePowerGridUptime();
+        
         return summary;
     }
     
@@ -429,6 +455,9 @@ public class GameStatsAPIImpl implements GameStatsAPI {
         summary.economy = getEconomySummary();
         summary.power = getPowerSummary();
         summary.efficiency = getEfficiencySummary();
+        summary.combat = getCombatSummary();
+        summary.spatial = getSpatialSummary();
+        summary.transport = getTransportSummary();
         summary.gameStartTime = 0; // Would need to track game start
         summary.currentTime = getTotalGameTime();
         summary.currentWave = getCurrentWave();
@@ -547,7 +576,8 @@ public class GameStatsAPIImpl implements GameStatsAPI {
         // Sum power from all active generators
         float total = 0f;
         Groups.build.each(build -> {
-            if (build instanceof PowerGenerator.GeneratorBuild gen && build.team == state.rules.defaultTeam) {
+            if (build instanceof PowerGenerator.GeneratorBuild && build.team == state.rules.defaultTeam) {
+                PowerGenerator.GeneratorBuild gen = (PowerGenerator.GeneratorBuild) build;
                 total += gen.getPowerProduction();
             }
         });
@@ -766,5 +796,297 @@ public class GameStatsAPIImpl implements GameStatsAPI {
             updateGameOutcome(); // Check for game outcome changes
             fireStatsUpdate();
         }
+    }
+
+    // === Additional Resource and Production Statistics ===
+    
+    @Override
+    public long getTotalResourcesProduced() {
+        long total = 0;
+        var produced = getItemsProduced();
+        for (var entry : produced.entries()) {
+            total += entry.value;
+        }
+        return total;
+    }
+    
+    @Override
+    public float getAverageResourceThroughput() {
+        long totalTime = getTotalGameTime();
+        if (totalTime == 0) return 0f;
+        return getTotalResourcesProduced() / (totalTime / 60f); // Resources per second
+    }
+    
+    @Override
+    public int getProductionChainsCompleted() {
+        // Count complex items produced (items that require multiple ingredients)
+        int completed = 0;
+        var produced = getItemsProduced();
+        for (var entry : produced.entries()) {
+            Item item = entry.key;
+            // Check if item has recipes (indicating it's produced, not mined)
+            if (item != null && item.hardness <= 0) { // Not a raw material
+                completed += entry.value;
+            }
+        }
+        return completed;
+    }
+    
+    @Override
+    public float getResourcesPerTick() {
+        var currentRates = getCurrentProductionRates();
+        float total = 0f;
+        for (var rate : currentRates.values()) {
+            total += rate;
+        }
+        return total / 60f; // Convert from per-second to per-tick
+    }
+    
+    @Override
+    public float getItemsTransportedPerTick() {
+        // Calculate items transported across conveyors
+        float total = 0f;
+        Groups.build.each(build -> {
+            if (build.block.category == Block.Category.distribution && build.team == state.rules.defaultTeam) {
+                // Estimate throughput based on conveyor speed and capacity
+                total += build.block.speed * 60f; // Approximate items per second
+            }
+        });
+        return total / 60f; // Convert to per-tick
+    }
+    
+    @Override
+    public float getProductionLineLatency() {
+        // Calculate average time between input and output in production chains
+        // This is a complex calculation that would need production chain analysis
+        // For now, return an estimate based on building efficiency
+        return 1.0f / Math.max(0.1f, calculateBuildingEfficiency());
+    }
+    
+    @Override
+    public float getOutputPerBuilding() {
+        int totalBuildings = getBasicStats().buildingsBuilt;
+        if (totalBuildings == 0) return 0f;
+        
+        long totalProduced = getTotalResourcesProduced();
+        return totalProduced / (float) totalBuildings;
+    }
+    
+    // === Enhanced Power Statistics ===
+    
+    @Override
+    public long getTimeWithPositivePower() {
+        // Track time when generation > consumption
+        // This would need to be tracked over time in a real implementation
+        long totalTime = getTotalGameTime();
+        float currentEfficiency = getCurrentPowerEfficiency();
+        if (currentEfficiency > 1.0f) {
+            return totalTime; // Simplified: assume current state for all time
+        } else {
+            return (long) (totalTime * currentEfficiency);
+        }
+    }
+    
+    @Override
+    public float getPowerGenerationRatio() {
+        float consumption = getCurrentPowerConsumption();
+        if (consumption == 0) return Float.POSITIVE_INFINITY;
+        return getCurrentPowerGeneration() / consumption;
+    }
+    
+    @Override
+    public float getAveragePowerGridUptime() {
+        // Calculate uptime based on shortage statistics
+        long totalTime = getTotalGameTime();
+        long shortageTime = getTotalPowerShortageTime();
+        if (totalTime == 0) return 100f;
+        return ((totalTime - shortageTime) / (float) totalTime) * 100f;
+    }
+    
+    // === Combat and Survival Statistics ===
+    
+    @Override
+    public int getWavesSurvived() {
+        return state.wave - 1; // Current wave minus 1 (waves survived so far)
+    }
+    
+    @Override
+    public long getTotalDamageDealt() {
+        // This would need to be tracked in the game stats
+        // For now, estimate based on enemy units destroyed
+        return getBasicStats().enemyUnitsDestroyed * 100L; // Rough estimate
+    }
+    
+    @Override
+    public long getTotalDamageReceived() {
+        // This would need to be tracked in the game stats
+        // For now, estimate based on buildings destroyed
+        return getBasicStats().buildingsDestroyed * 150L; // Rough estimate
+    }
+    
+    @Override
+    public float getStructureDestructionPercentage() {
+        int built = getBasicStats().buildingsBuilt;
+        int destroyed = getBasicStats().buildingsDestroyed;
+        if (built == 0) return 0f;
+        return (destroyed / (float) built) * 100f;
+    }
+    
+    // === Spatial and Infrastructure Statistics ===
+    
+    @Override
+    public int getAreaCoveredByStructures() {
+        int area = 0;
+        Groups.build.each(build -> {
+            if (build.team == state.rules.defaultTeam) {
+                area += build.block.size * build.block.size;
+            }
+        });
+        return area;
+    }
+    
+    @Override
+    public float getFurthestStructureDistance() {
+        var cores = state.teams.playerCores();
+        if (cores.isEmpty()) return 0f;
+        
+        var core = cores.first();
+        float maxDistance = 0f;
+        
+        Groups.build.each(build -> {
+            if (build.team == state.rules.defaultTeam) {
+                float distance = core.dst(build);
+                if (distance > maxDistance) {
+                    maxDistance = distance;
+                }
+            }
+        });
+        
+        return maxDistance / 8f; // Convert to tiles
+    }
+    
+    @Override
+    public float getMeanResourceBalanceVariance() {
+        var balance = getCurrentResourceBalance();
+        if (balance.isEmpty()) return 0f;
+        
+        // Calculate variance in resource levels
+        float mean = 0f;
+        for (var amount : balance.values()) {
+            mean += amount;
+        }
+        mean /= balance.size;
+        
+        float variance = 0f;
+        for (var amount : balance.values()) {
+            variance += (amount - mean) * (amount - mean);
+        }
+        variance /= balance.size;
+        
+        return (float) Math.sqrt(variance);
+    }
+    
+    // === Resource Balance and Production Chain Tracking ===
+    
+    @Override
+    public ObjectIntMap<Item> getCurrentResourceBalance() {
+        var balance = new ObjectIntMap<Item>();
+        var cores = state.teams.playerCores();
+        
+        if (!cores.isEmpty()) {
+            var core = cores.first();
+            for (var item : content.items()) {
+                balance.put(item, core.items.get(item));
+            }
+        }
+        
+        return balance;
+    }
+    
+    @Override
+    public ObjectFloatMap<Item> getProductionChainEfficiency() {
+        var efficiency = new ObjectFloatMap<Item>();
+        var produced = getCurrentProductionRates();
+        var consumed = getCurrentConsumptionRates();
+        
+        for (var item : content.items()) {
+            float production = produced.get(item, 0f);
+            float consumption = consumed.get(item, 0f);
+            
+            if (consumption > 0) {
+                efficiency.put(item, production / consumption);
+            } else if (production > 0) {
+                efficiency.put(item, 1.0f);
+            }
+        }
+        
+        return efficiency;
+    }
+    
+    @Override
+    public Seq<ProductionBottleneck> getProductionBottlenecks() {
+        var bottlenecks = new Seq<ProductionBottleneck>();
+        var efficiency = getProductionChainEfficiency();
+        
+        for (var entry : efficiency.entries()) {
+            if (entry.value < 0.8f) { // Consider <80% efficiency as bottleneck
+                var bottleneck = new ProductionBottleneck();
+                bottleneck.item = entry.key;
+                bottleneck.efficiency = entry.value;
+                bottleneck.reason = "Low production efficiency";
+                bottlenecks.add(bottleneck);
+            }
+        }
+        
+        return bottlenecks;
+    }
+    
+    // === Additional Summary Methods ===
+    
+    @Override
+    public CombatSummary getCombatSummary() {
+        var summary = new CombatSummary();
+        summary.totalDamageDealt = getTotalDamageDealt();
+        summary.totalDamageReceived = getTotalDamageReceived();
+        summary.wavesDefeated = getWavesSurvived();
+        summary.enemyUnitsDestroyed = getBasicStats().enemyUnitsDestroyed;
+        summary.playerUnitsLost = 0; // Would need tracking
+        summary.damageRatio = summary.totalDamageReceived > 0 ? 
+            summary.totalDamageDealt / (float) summary.totalDamageReceived : 0f;
+        summary.structureSurvivalRate = 100f - getStructureDestructionPercentage();
+        return summary;
+    }
+    
+    @Override
+    public SpatialSummary getSpatialSummary() {
+        var summary = new SpatialSummary();
+        summary.areaCovered = getAreaCoveredByStructures();
+        summary.furthestDistance = getFurthestStructureDistance();
+        summary.totalStructures = getBasicStats().buildingsBuilt - getBasicStats().buildingsDestroyed;
+        summary.structureDensity = summary.areaCovered > 0 ? 
+            summary.totalStructures / (float) summary.areaCovered : 0f;
+        summary.coreProximityScore = 100f - (getFurthestStructureDistance() / 50f); // Arbitrary scale
+        summary.isolatedStructures = 0; // Would need connectivity analysis
+        return summary;
+    }
+    
+    @Override
+    public TransportSummary getTransportSummary() {
+        var summary = new TransportSummary();
+        summary.itemsPerTick = getItemsTransportedPerTick();
+        summary.averageLatency = getProductionLineLatency();
+        summary.transportEfficiency = 1.0f / Math.max(0.1f, summary.averageLatency);
+        summary.totalConveyors = 0;
+        
+        // Count conveyors
+        Groups.build.each(build -> {
+            if (build.block.category == Block.Category.distribution && build.team == state.rules.defaultTeam) {
+                summary.totalConveyors++;
+            }
+        });
+        
+        summary.bottleneckPoints = getProductionBottlenecks().size;
+        summary.throughputUtilization = Math.min(1.0f, summary.itemsPerTick / Math.max(1f, summary.totalConveyors));
+        return summary;
     }
 }
