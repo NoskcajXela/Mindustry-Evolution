@@ -91,6 +91,9 @@ public class NeuralEvolutionaryAI {
             Log.info("Evolution completed! Best fitness: " + bestFitness);
             Log.info("Best network: " + bestNetwork.toString());
             
+            // Save best network
+            saveBestNetwork();
+            
             return bestNetwork;
             
         } catch (Exception e) {
@@ -442,6 +445,62 @@ public class NeuralEvolutionaryAI {
     
     public Seq<Float> getGenerationAverageFitness() {
         return generationAverageFitness.copy();
+    }
+    
+    /**
+     * Save the best network to disk.
+     */
+    private void saveBestNetwork() {
+        if (bestNetwork == null) {
+            Log.warn("No best network to save");
+            return;
+        }
+        
+        try {
+            // Create directory if it doesn't exist
+            var saveDir = new arc.files.Fi("trained_networks");
+            if (!saveDir.exists()) {
+                saveDir.mkdirs();
+            }
+            
+            // Generate filename with timestamp and fitness
+            String timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
+            String filename = String.format("neural_ai_gen%d_fitness%.0f_%s.nnet", 
+                currentGeneration + 1, bestFitness, timestamp);
+            
+            var saveFile = saveDir.child(filename);
+            bestNetwork.save(saveFile);
+            
+            // Also save as "best_neural_ai.nnet" for easy access
+            bestNetwork.save(saveDir.child("best_neural_ai.nnet"));
+            
+            Log.info("Best network saved to: " + saveFile.absolutePath());
+            Log.info("Also saved as: trained_networks/best_neural_ai.nnet");
+        } catch (Exception e) {
+            Log.err("Failed to save best network", e);
+        }
+    }
+    
+    /**
+     * Load a previously trained network.
+     */
+    public static NeuralNetwork loadBestNetwork() {
+        var file = new arc.files.Fi("trained_networks/best_neural_ai.nnet");
+        if (!file.exists()) {
+            throw new RuntimeException("No trained network found at: " + file.absolutePath());
+        }
+        return NeuralNetwork.load(file);
+    }
+    
+    /**
+     * Load a specific network file.
+     */
+    public static NeuralNetwork loadNetwork(String filename) {
+        var file = new arc.files.Fi("trained_networks/" + filename);
+        if (!file.exists()) {
+            throw new RuntimeException("Network file not found: " + file.absolutePath());
+        }
+        return NeuralNetwork.load(file);
     }
     
     // === Inner Classes ===

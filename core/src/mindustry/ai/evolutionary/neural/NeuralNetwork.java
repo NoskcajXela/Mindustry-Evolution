@@ -2,7 +2,9 @@ package mindustry.ai.evolutionary.neural;
 
 import arc.struct.*;
 import arc.util.*;
+import arc.files.*;
 import java.util.*;
+import java.io.*;
 
 /**
  * Simple feedforward neural network for AI decision making.
@@ -224,6 +226,143 @@ public class NeuralNetwork {
         }
         sb.append("] (").append(getParameterCount()).append(" params)");
         return sb.toString();
+    }
+    
+    // === Serialization ===
+    
+    /**
+     * Save this network to a file.
+     */
+    public void save(Fi file) {
+        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(file.write(false)))) {
+            // Write header
+            out.writeInt(0x4E4E4554); // "NNET" magic number
+            out.writeInt(1); // Version
+            
+            // Write network architecture
+            out.writeInt(layerSizes.length);
+            for (int size : layerSizes) {
+                out.writeInt(size);
+            }
+            
+            // Write hyperparameters
+            out.writeFloat(learningRate);
+            out.writeInt(activationFunction.ordinal());
+            
+            // Write weights
+            for (int layer = 0; layer < weights.length; layer++) {
+                for (int i = 0; i < weights[layer].length; i++) {
+                    for (int j = 0; j < weights[layer][i].length; j++) {
+                        out.writeFloat(weights[layer][i][j]);
+                    }
+                }
+            }
+            
+            // Write biases
+            for (int layer = 0; layer < biases.length; layer++) {
+                for (int i = 0; i < biases[layer].length; i++) {
+                    out.writeFloat(biases[layer][i]);
+                }
+            }
+            
+            // Write training stats
+            out.writeFloat(totalError);
+            out.writeInt(trainingSteps);
+            
+            Log.info("Network saved to: " + file.absolutePath());
+        } catch (IOException e) {
+            Log.err("Failed to save network", e);
+            throw new RuntimeException("Failed to save network to " + file, e);
+        }
+    }
+    
+    /**
+     * Save this network to a file path.
+     */
+    public void save(String filePath) {
+        save(new Fi(filePath));
+    }
+    
+    /**
+     * Load a network from a file.
+     */
+    public static NeuralNetwork load(Fi file) {
+        try (DataInputStream in = new DataInputStream(new BufferedInputStream(file.read()))) {
+            // Read and verify header
+            int magic = in.readInt();
+            if (magic != 0x4E4E4554) {
+                throw new IOException("Invalid network file: wrong magic number");
+            }
+            
+            int version = in.readInt();
+            if (version != 1) {
+                throw new IOException("Unsupported network version: " + version);
+            }
+            
+            // Read network architecture
+            int numLayers = in.readInt();
+            int[] layerSizes = new int[numLayers];
+            for (int i = 0; i < numLayers; i++) {
+                layerSizes[i] = in.readInt();
+            }
+            
+            // Read hyperparameters
+            float learningRate = in.readFloat();
+            ActivationFunction activationFunc = ActivationFunction.values()[in.readInt()];
+            
+            // Create network
+            NeuralNetwork network = new NeuralNetwork(layerSizes, learningRate, activationFunc);
+            
+            // Read weights
+            for (int layer = 0; layer < network.weights.length; layer++) {
+                for (int i = 0; i < network.weights[layer].length; i++) {
+                    for (int j = 0; j < network.weights[layer][i].length; j++) {
+                        network.weights[layer][i][j] = in.readFloat();
+                    }
+                }
+            }
+            
+            // Read biases
+            for (int layer = 0; layer < network.biases.length; layer++) {
+                for (int i = 0; i < network.biases[layer].length; i++) {
+                    network.biases[layer][i] = in.readFloat();
+                }
+            }
+            
+            // Read training stats
+            network.totalError = in.readFloat();
+            network.trainingSteps = in.readInt();
+            
+            Log.info("Network loaded from: " + file.absolutePath());
+            Log.info("Architecture: " + network.toString());
+            
+            return network;
+        } catch (IOException e) {
+            Log.err("Failed to load network", e);
+            throw new RuntimeException("Failed to load network from " + file, e);
+        }
+    }
+    
+    /**
+     * Load a network from a file path.
+     */
+    public static NeuralNetwork load(String filePath) {
+        return load(new Fi(filePath));
+    }
+    
+    /**
+     * Check if a file is a valid network file.
+     */
+    public static boolean isValidNetworkFile(Fi file) {
+        if (!file.exists()) return false;
+        
+        try (DataInputStream in = new DataInputStream(new BufferedInputStream(file.read()))) {
+            int magic = in.readInt();
+            int version = in.readInt();
+            return magic == 0x4E4E4554 && version == 1;
+        } catch (Exception e) {
+            return false;
+        }
     }
     
     // === Activation Functions ===
